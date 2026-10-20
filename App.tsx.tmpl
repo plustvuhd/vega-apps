@@ -1,0 +1,64 @@
+import React, { useEffect, useState } from 'react';
+import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { WebView } from '@amazon-devices/webview';
+
+// ===== Preenchido pelo generate.sh (não edite à mão) =====
+const PANEL = '__PANEL__';
+const DISCOVERY = '__DISCOVERY__';
+const OWNER = '__OWNER__';
+const BRAND = '__BRAND__';
+// =========================================================
+
+function clean(u: string) { return (u || '').trim().replace(/\/+$/, ''); }
+
+async function getJson(url: string, ms: number): Promise<any> {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), ms);
+  try { const r = await fetch(url, { signal: ctl.signal }); return await r.json(); } finally { clearTimeout(t); }
+}
+
+// Descobre o painel online: arquivo de descoberta (GitHub) -> endereço padrão
+async function pickPanel(): Promise<string> {
+  const cands: string[] = [];
+  if (DISCOVERY) { try { const j = await getJson(DISCOVERY, 6000); if (j && j.panel) cands.push(clean(j.panel)); } catch {} }
+  cands.push(clean(PANEL));
+  for (const p of cands) {
+    if (!p.startsWith('https://')) continue; // Vega: só HTTPS
+    try { await getJson(p + '/api/public/loja-ativacao/ping', 6000); return p; } catch {}
+  }
+  return clean(PANEL);
+}
+
+export const App = () => {
+  const [url, setUrl] = useState<string | null>(null);
+  const [fail, setFail] = useState(false);
+  const load = () => {
+    setFail(false); setUrl(null);
+    pickPanel().then((p) => {
+      setUrl(p + '/player' + (OWNER ? '/' + encodeURIComponent(OWNER) : '') + '?tv=vega' + (BRAND ? '&brand=' + encodeURIComponent(BRAND) : ''));
+    });
+  };
+  useEffect(load, []);
+
+  if (!url) return (<View style={s.c}><ActivityIndicator size="large" /></View>);
+  return (
+    <View style={s.c}>
+      <WebView
+        source={{ uri: url }}
+        hasTVPreferredFocus
+        javaScriptEnabled
+        allowSystemKeyEvents
+        style={s.c}
+        onError={() => setFail(true)}
+        onHttpError={() => setFail(true)}
+      />
+      {fail ? (<View style={s.err}><Text style={s.t} onPress={load}>Sem conexão. Pressione OK para tentar de novo.</Text></View>) : null}
+    </View>
+  );
+};
+
+const s = StyleSheet.create({
+  c: { flex: 1, backgroundColor: '#000' },
+  err: { position: 'absolute', left: 0, right: 0, bottom: 0, top: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000c' },
+  t: { color: '#fff', fontSize: 28 },
+});
