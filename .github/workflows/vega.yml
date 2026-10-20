@@ -20,7 +20,8 @@ jobs:
           node-version: 20
       - name: Instalar Vega SDK
         run: |
-          curl -fsSL https://sdk-installer.vega.labcollab.net/get_vvm.sh | bash
+          curl -fsSL https://sdk-installer.vega.labcollab.net/get_vvm.sh -o get_vvm.sh
+          printf '\n\n\n\n\n\n\n\n' | bash get_vvm.sh
           source ~/vega/env
           vega --version || true
       - name: Gerar
